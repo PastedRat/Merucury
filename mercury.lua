@@ -244,8 +244,7 @@ end
 
 local function getPredictedPosition(part)
     local velocity = part.AssemblyLinearVelocity or Vector3.zero
-    return part.Position
- velocity * Settings.Prediction
+    return part.Position + velocity * Settings.Prediction
 end
 
 -- Closest target to crosshair inside FOV (first-person feel)
@@ -408,8 +407,7 @@ local function updateOreESP()
         if (oreName == "iron" or oreName == "stone" or oreName == "sulfur") and shouldShowOre(ore.Name) then
             local part = ore:IsA("BasePart") and ore or ore:FindFirstChildWhichIsA("BasePart")
             if part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position
- Vector3.new(0, 2, 0))
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position + Vector3.new(0, 2, 0))
                 local txt = oreEspObjects[ore]
                 if not txt then
                     txt = Drawing.new("Text")
@@ -474,8 +472,7 @@ local function updateESPForPlayer(player)
         return
     end
 
-    local topPos = Camera:WorldToViewportPoint(head.Position
- Vector3.new(0, 0.45, 0))
+    local topPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.45, 0))
     local bottomPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
     local height = math.max(bottomPos.Y - topPos.Y, 12)
     local width = math.max(height / 2.05, 8)
@@ -496,8 +493,7 @@ local function updateESPForPlayer(player)
 
     obj.BoxOutline.Size = Vector2.new(width, height)
     obj.BoxOutline.Position = Vector2.new(x, y)
-    obj.BoxOutline.Thickness = thickness
- 2
+    obj.BoxOutline.Thickness = thickness + 2
     obj.BoxOutline.Visible = Settings.ESPBoxes and not planetary
 
     obj.Name.Size = textSize
@@ -511,30 +507,24 @@ local function updateESPForPlayer(player)
     obj.Distance.Color = Color3.fromRGB(220, 220, 220)
     obj.Distance.Text = string.format("%dm", math.floor(distance / 3))
     obj.Distance.Font = fontIndex
-    obj.Distance.Position = Vector2.new(rootPos.X, y
- height
- 2)
+    obj.Distance.Position = Vector2.new(rootPos.X, y + height + 2)
     obj.Distance.Visible = Settings.ESPDistance
 
     obj.Tracer.From = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y - 30)
-    obj.Tracer.To = Vector2.new(rootPos.X, y
- height)
+    obj.Tracer.To = Vector2.new(rootPos.X, y + height)
     obj.Tracer.Color = color
     obj.Tracer.Thickness = thickness
     obj.Tracer.Visible = Settings.ESPTracers
 
     local healthPct = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
     local healthX = x - 7
-    local hbTop = y
- height
+    local hbTop = y + height
     local hbBottom = y
     local hbCurrent = hbTop - (height * healthPct)
 
-    obj.HealthOutline.From = Vector2.new(healthX, hbTop
- 1)
+    obj.HealthOutline.From = Vector2.new(healthX, hbTop + 1)
     obj.HealthOutline.To = Vector2.new(healthX, hbBottom - 1)
-    obj.HealthOutline.Thickness = thickness
- 1
+    obj.HealthOutline.Thickness = thickness + 1
     obj.HealthOutline.Visible = Settings.ESPHealthBar
 
     obj.HealthBar.From = Vector2.new(healthX, hbTop)
@@ -546,33 +536,23 @@ local function updateESPForPlayer(player)
     if planetary and Settings.ESPBoxes then
         local cornerLen = math.max(math.floor(width * 0.28), 5)
 
-        obj.CornerTL.From = Vector2.new(x, y
- cornerLen)
+        obj.CornerTL.From = Vector2.new(x, y + cornerLen)
         obj.CornerTL.To = Vector2.new(x, y)
         obj.CornerTL.Thickness = thickness
         obj.CornerTL.Color = color
 
-        obj.CornerTR.From = Vector2.new(x
- width, y
- cornerLen)
-        obj.CornerTR.To = Vector2.new(x
- width, y)
+        obj.CornerTR.From = Vector2.new(x + width, y + cornerLen)
+        obj.CornerTR.To = Vector2.new(x + width, y)
         obj.CornerTR.Thickness = thickness
         obj.CornerTR.Color = color
 
-        obj.CornerBL.From = Vector2.new(x, y
- height - cornerLen)
-        obj.CornerBL.To = Vector2.new(x, y
- height)
+        obj.CornerBL.From = Vector2.new(x, y + height - cornerLen)
+        obj.CornerBL.To = Vector2.new(x, y + height)
         obj.CornerBL.Thickness = thickness
         obj.CornerBL.Color = color
 
-        obj.CornerBR.From = Vector2.new(x
- width, y
- height - cornerLen)
-        obj.CornerBR.To = Vector2.new(x
- width, y
- height)
+        obj.CornerBR.From = Vector2.new(x + width, y + height - cornerLen)
+        obj.CornerBR.To = Vector2.new(x + width, y + height)
         obj.CornerBR.Thickness = thickness
         obj.CornerBR.Color = color
 
@@ -583,10 +563,8 @@ local function updateESPForPlayer(player)
 
         local orbitRadius = math.max(width * 0.65, 10)
         local t = tick() * 2.2
-        local orbitCenter = Vector2.new(rootPos.X, y
- height * 0.5)
-        local dotPos = orbitCenter
- Vector2.new(math.cos(t) * orbitRadius, math.sin(t) * orbitRadius)
+        local orbitCenter = Vector2.new(rootPos.X, y + height * 0.5)
+        local dotPos = orbitCenter + Vector2.new(math.cos(t) * orbitRadius, math.sin(t) * orbitRadius)
 
         obj.Orbit.Position = orbitCenter
         obj.Orbit.Radius = orbitRadius
@@ -649,8 +627,7 @@ local function updateArrowESP()
 
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
-    local baseRadius = Settings.FOV
- Settings.ArrowRadiusOffset
+    local baseRadius = Settings.FOV + Settings.ArrowRadiusOffset
     local used = {}
     local i = 0
 
@@ -673,46 +650,32 @@ local function updateArrowESP()
                         if dist < Settings.FOV * 0.85 then
                             tri.Visible = false
                         else
-                            i = i
- 1
-                            local radius = baseRadius
- ((i % math.max(Settings.ArrowCount, 1)) * 1.5)
-                            local pos = center
- dir * radius
+                            i = i + 1
+                            local radius = baseRadius + ((i % math.max(Settings.ArrowCount, 1)) * 1.5)
+                            local pos = center + dir * radius
                             local perp = Vector2.new(-dir.Y, dir.X)
                             local len = 13
-                            tri.PointA = pos
- dir * len
-                            tri.PointB = pos - dir * (len * 0.7)
- perp * (len * 0.58)
+                            tri.PointA = pos + dir * len
+                            tri.PointB = pos - dir * (len * 0.7) + perp * (len * 0.58)
                             tri.PointC = pos - dir * (len * 0.7) - perp * (len * 0.58)
-                            local hue = (tick() * 0.22
- (i * 0.07)) % 1
+                            local hue = (tick() * 0.22 + (i * 0.07)) % 1
                             tri.Color = Color3.fromHSV(hue, 0.85, 1)
                             tri.Visible = true
                             used[player] = true
                         end
                     else
-                        i = i
- 1
-                        local radius = baseRadius
- ((i % math.max(Settings.ArrowCount, 1)) * 1.5)
+                        i = i + 1
+                        local radius = baseRadius + ((i % math.max(Settings.ArrowCount, 1)) * 1.5)
                         local spin = tick() * 0.8
-                        local ang = math.atan2(dir.Y, dir.X)
- (math.sin(spin
- i) * 0.08)
+                        local ang = math.atan2(dir.Y, dir.X) + (math.sin(spin + i) * 0.08)
                         local rdir = Vector2.new(math.cos(ang), math.sin(ang))
-                        local pos = center
- rdir * radius
+                        local pos = center + rdir * radius
                         local perp = Vector2.new(-rdir.Y, rdir.X)
                         local len = 13
-                        tri.PointA = pos
- rdir * len
-                        tri.PointB = pos - rdir * (len * 0.7)
- perp * (len * 0.58)
+                        tri.PointA = pos + rdir * len
+                        tri.PointB = pos - rdir * (len * 0.7) + perp * (len * 0.58)
                         tri.PointC = pos - rdir * (len * 0.7) - perp * (len * 0.58)
-                        local hue = (tick() * 0.35
- (i * 0.08)) % 1
+                        local hue = (tick() * 0.35 + (i * 0.08)) % 1
                         tri.Color = Color3.fromHSV(hue, 0.9, 1)
                         tri.Visible = true
                         used[player] = true
@@ -812,8 +775,7 @@ local function getSilentTargetPart(origin)
                             if forward > 0.05 then
                                 local crossDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                                 if crossDist <= Settings.FOV then
-                                    local score = crossDist
- (1 - forward) * 30
+                                    local score = crossDist + (1 - forward) * 30
                                     if score < bestScore then
                                         bestScore = score
                                         bestPart = part
