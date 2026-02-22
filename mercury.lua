@@ -1,6 +1,20 @@
 -- Mercury First-Person Aimbot (rebuilt from working pattern provided by user)  
 local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
+
+local function getCamera()
+    local cam = workspace.CurrentCamera
+    if cam and cam:IsA("Camera") then
+        Camera = cam
+        return cam
+    end
+    if Camera and Camera:IsA("Camera") then
+        return Camera
+    end
+    return nil
+end
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -230,7 +244,9 @@ local function isVisible(targetPart)
 
     rayParams.FilterDescendantsInstances = { myChar }
 
-    local origin = Camera.CFrame.Position
+    local cam = getCamera()
+    if not cam then return false end
+    local origin = cam.CFrame.Position
     local direction = targetPart.Position - origin
     local hit = workspace:Raycast(origin, direction, rayParams)
 
@@ -252,7 +268,9 @@ local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = math.huge
 
-    local center = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
+    local cam = getCamera()
+    if not cam then return nil end
+    local center = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -271,7 +289,9 @@ local function getClosestPlayer()
                     continue
                 end
 
-                local viewportPoint, onScreen = Camera:WorldToViewportPoint(part.Position)
+                local cam = getCamera()
+                if not cam then continue end
+                local viewportPoint, onScreen = cam:WorldToViewportPoint(part.Position)
                 if onScreen and viewportPoint.Z > 0 then
                     local screenDistance = (Vector2.new(viewportPoint.X, viewportPoint.Y) - center).Magnitude
                     if screenDistance <= Settings.FOV and screenDistance < shortestDistance then
@@ -407,7 +427,9 @@ local function updateOreESP()
         if (oreName == "iron" or oreName == "stone" or oreName == "sulfur") and shouldShowOre(ore.Name) then
             local part = ore:IsA("BasePart") and ore or ore:FindFirstChildWhichIsA("BasePart")
             if part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position + Vector3.new(0, 2, 0))
+                local cam = getCamera()
+                if not cam then continue end
+                local pos, onScreen = cam:WorldToViewportPoint(part.Position + Vector3.new(0, 2, 0))
                 local txt = oreEspObjects[ore]
                 if not txt then
                     txt = Drawing.new("Text")
@@ -460,20 +482,26 @@ local function updateESPForPlayer(player)
         return
     end
 
-    local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+    local cam = getCamera()
+    if not cam then
+        hideESPObject(obj)
+        return
+    end
+
+    local rootPos, onScreen = cam:WorldToViewportPoint(root.Position)
     if not onScreen or rootPos.Z <= 0 then
         hideESPObject(obj)
         return
     end
 
-    local distance = (Camera.CFrame.Position - root.Position).Magnitude
+    local distance = (cam.CFrame.Position - root.Position).Magnitude
     if distance > Settings.ESPMaxDistance then
         hideESPObject(obj)
         return
     end
 
-    local topPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.45, 0))
-    local bottomPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
+    local topPos = cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.45, 0))
+    local bottomPos = cam:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
     local height = math.max(bottomPos.Y - topPos.Y, 12)
     local width = math.max(height / 2.05, 8)
 
@@ -510,7 +538,7 @@ local function updateESPForPlayer(player)
     obj.Distance.Position = Vector2.new(rootPos.X, y + height + 2)
     obj.Distance.Visible = Settings.ESPDistance
 
-    obj.Tracer.From = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y - 30)
+    obj.Tracer.From = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y - 30)
     obj.Tracer.To = Vector2.new(rootPos.X, y + height)
     obj.Tracer.Color = color
     obj.Tracer.Thickness = thickness
@@ -625,7 +653,9 @@ local function updateArrowESP()
         return
     end
 
-    local vp = Camera.ViewportSize
+    local cam = getCamera()
+    if not cam then return end
+    local vp = cam.ViewportSize
     local center = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
     local baseRadius = Settings.FOV + Settings.ArrowRadiusOffset
     local used = {}
@@ -636,7 +666,9 @@ local function updateArrowESP()
             local part = player.Character:FindFirstChild(Settings.LockPart) or player.Character:FindFirstChild("HumanoidRootPart")
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             if part and humanoid and humanoid.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                local cam = getCamera()
+                if not cam then continue end
+                local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
                 local tri = getArrowObject(player)
                 local dir = Vector2.new(screenPos.X, screenPos.Y) - center
                 if screenPos.Z <= 0 then
@@ -746,10 +778,13 @@ local function tryAutoReloadFromHookState()
 end
 
 local function getSilentTargetPart(origin)
-    local originPos = typeof(origin) == "Vector3" and origin or Camera.CFrame.Position
+    local cam = getCamera()
+    local originPos = typeof(origin) == "Vector3" and origin or (cam and cam.CFrame.Position) or Vector3.zero
     local bestPart = nil
     local bestScore = math.huge
-    local center = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
+    local cam = getCamera()
+    if not cam then return nil end
+    local center = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -764,14 +799,16 @@ local function getSilentTargetPart(origin)
 
             local part = char:FindFirstChild(Settings.LockPart) or char:FindFirstChild("HumanoidRootPart")
             if part and part:IsA("BasePart") then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                local cam = getCamera()
+                if not cam then continue end
+                local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
                 if onScreen and screenPos.Z > 0 then
                     if isVisible(part) then
                         local toTarget = (part.Position - originPos)
                         local mag = toTarget.Magnitude
                         if mag > 0.001 then
                             local dir = toTarget / mag
-                            local forward = Camera.CFrame.LookVector:Dot(dir)
+                            local forward = cam.CFrame.LookVector:Dot(dir)
                             if forward > 0.05 then
                                 local crossDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                                 if crossDist <= Settings.FOV then
@@ -793,7 +830,8 @@ local function getSilentTargetPart(origin)
 end
 
 local function applyBuiltInSilentAim(self, origin, targetPart, ...)
-    local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or Camera.CFrame.Position
+    local cam = getCamera()
+    local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or (cam and cam.CFrame.Position) or Vector3.zero
     if not targetPart then
         return nil
     end
@@ -868,7 +906,8 @@ local function installGameHooks()
 
     gunClient.getfireDirection = function(self, origin, ...)
         if Settings.Enabled and Settings.AimbotType == "Silent" then
-            local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or Camera.CFrame.Position
+            local cam = getCamera()
+    local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or (cam and cam.CFrame.Position) or Vector3.zero
             local targetPart = getSilentTargetPart(originPos)
             if targetPart then
                 local aimCFrame, aimDir = applyBuiltInSilentAim(self, origin, targetPart, ...)
@@ -934,7 +973,9 @@ local function installNoRadiationHook()
 end
 
 RunService.RenderStepped:Connect(function()
-    local vp = Camera.ViewportSize
+    local cam = getCamera()
+    if not cam then return end
+    local vp = cam.ViewportSize
     fovCircle.Position = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
     fovCircle.Radius = Settings.FOV
     fovCircle.Visible = Settings.ShowFOV
@@ -964,15 +1005,15 @@ RunService.RenderStepped:Connect(function()
         local targetPart = target.Character:FindFirstChild(Settings.LockPart)
         if targetPart then
             local targetPosition = getPredictedPosition(targetPart)
-            local cameraPosition = Camera.CFrame.Position
+            local cameraPosition = cam.CFrame.Position
 
             -- IMPORTANT: true first-person lock (do not offset camera position)
             local newCFrame = CFrame.lookAt(cameraPosition, targetPosition)
 
             if Settings.Sensitivity > 0 then
-                Camera.CFrame = Camera.CFrame:Lerp(newCFrame, Settings.Sensitivity)
+                cam.CFrame = cam.CFrame:Lerp(newCFrame, Settings.Sensitivity)
             else
-                Camera.CFrame = newCFrame
+                cam.CFrame = newCFrame
             end
         end
     end
