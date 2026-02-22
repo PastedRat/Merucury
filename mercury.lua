@@ -68,7 +68,6 @@ local Settings = {
     FOV = 220,
     ShowFOV = true,
     AimbotType = "Camera", -- Camera / Silent
-    SilentRaycast = true,
 
 
     ESPEnabled = true,
@@ -949,36 +948,6 @@ local function installGameHooks()
     return true
 end
 
-local function installSilentRaycastHook()
-    if raycastSilentHook.installed or not hookmetamethod then return end
-
-    local old
-    old = hookmetamethod(game, "__namecall", newcclosure(function(...)
-        local method = getnamecallmethod and getnamecallmethod()
-        local args = { ... }
-        local selfObj = args[1]
-
-        if method == "Raycast" and selfObj == workspace and not checkcaller() and Settings.Enabled and Settings.AimbotType == "Silent" and Settings.SilentRaycast then
-            local origin = args[2]
-            local direction = args[3]
-            if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-                local targetPart = getSilentTargetPart(origin)
-                if targetPart and typeof(targetPart.Position) == "Vector3" then
-                    args[3] = targetPart.Position - origin
-                    local okCast, result = pcall(old, (unpack or table.unpack)(args))
-                    if okCast then
-                        return result
-                    end
-                end
-            end
-        end
-
-        return old(...)
-    end))
-
-    raycastSilentHook.installed = true
-end
-
 local function installNoRadiationHook()
     if noRadHook.installed or not hookmetamethod then return end
     local old
@@ -1042,7 +1011,6 @@ end)
 
 RunService.Heartbeat:Connect(function()
     installGameHooks()
-    installSilentRaycastHook()
     installNoRadiationHook()
     tryAutoReloadFromHookState()
 
@@ -1103,15 +1071,6 @@ CombatTab:Dropdown({
         if Settings.AimbotType == "Silent" then
             installGameHooks()
         end
-    end
-})
-
-CombatTab:Toggle({
-    Name = "Silent Raycast Hook",
-    StartingState = true,
-    Description = "Redirect workspace:Raycast toward silent target",
-    Callback = function(state)
-        Settings.SilentRaycast = state
     end
 })
 
