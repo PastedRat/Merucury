@@ -16,6 +16,22 @@ local function getCamera()
     return nil
 end
 
+local function safeWorldToViewportPoint(position)
+    local cam = getCamera()
+    if not cam then
+        return nil, false
+    end
+
+    local ok, point, onScreen = pcall(function()
+        return cam:WorldToViewportPoint(position)
+    end)
+    if not ok then
+        return nil, false
+    end
+
+    return point, onScreen
+end
+
 local LocalPlayer = Players.LocalPlayer
 
 -- Mercury loader
@@ -289,9 +305,8 @@ local function getClosestPlayer()
                     continue
                 end
 
-                local cam = getCamera()
-                if not cam then continue end
-                local viewportPoint, onScreen = cam:WorldToViewportPoint(part.Position)
+                local viewportPoint, onScreen = safeWorldToViewportPoint(part.Position)
+                if not viewportPoint then continue end
                 if onScreen and viewportPoint.Z > 0 then
                     local screenDistance = (Vector2.new(viewportPoint.X, viewportPoint.Y) - center).Magnitude
                     if screenDistance <= Settings.FOV and screenDistance < shortestDistance then
@@ -427,9 +442,8 @@ local function updateOreESP()
         if (oreName == "iron" or oreName == "stone" or oreName == "sulfur") and shouldShowOre(ore.Name) then
             local part = ore:IsA("BasePart") and ore or ore:FindFirstChildWhichIsA("BasePart")
             if part then
-                local cam = getCamera()
-                if not cam then continue end
-                local pos, onScreen = cam:WorldToViewportPoint(part.Position + Vector3.new(0, 2, 0))
+                local pos, onScreen = safeWorldToViewportPoint(part.Position + Vector3.new(0, 2, 0))
+                if not pos then continue end
                 local txt = oreEspObjects[ore]
                 if not txt then
                     txt = Drawing.new("Text")
@@ -488,7 +502,11 @@ local function updateESPForPlayer(player)
         return
     end
 
-    local rootPos, onScreen = cam:WorldToViewportPoint(root.Position)
+    local rootPos, onScreen = safeWorldToViewportPoint(root.Position)
+    if not rootPos then
+        hideESPObject(obj)
+        return
+    end
     if not onScreen or rootPos.Z <= 0 then
         hideESPObject(obj)
         return
@@ -500,8 +518,13 @@ local function updateESPForPlayer(player)
         return
     end
 
-    local topPos = cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.45, 0))
-    local bottomPos = cam:WorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))
+    local topPos = ({safeWorldToViewportPoint(head.Position + Vector3.new(0, 0.45, 0))})[1]
+    local bottomPos = ({safeWorldToViewportPoint(root.Position - Vector3.new(0, 3.2, 0))})[1]
+    if not (topPos and bottomPos) then
+        hideESPObject(obj)
+        return
+    end
+
     local height = math.max(bottomPos.Y - topPos.Y, 12)
     local width = math.max(height / 2.05, 8)
 
@@ -666,9 +689,8 @@ local function updateArrowESP()
             local part = player.Character:FindFirstChild(Settings.LockPart) or player.Character:FindFirstChild("HumanoidRootPart")
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             if part and humanoid and humanoid.Health > 0 then
-                local cam = getCamera()
-                if not cam then continue end
-                local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+                local screenPos, onScreen = safeWorldToViewportPoint(part.Position)
+                if not screenPos then continue end
                 local tri = getArrowObject(player)
                 local dir = Vector2.new(screenPos.X, screenPos.Y) - center
                 if screenPos.Z <= 0 then
@@ -799,9 +821,8 @@ local function getSilentTargetPart(origin)
 
             local part = char:FindFirstChild(Settings.LockPart) or char:FindFirstChild("HumanoidRootPart")
             if part and part:IsA("BasePart") then
-                local cam = getCamera()
-                if not cam then continue end
-                local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+                local screenPos, onScreen = safeWorldToViewportPoint(part.Position)
+                if not screenPos then continue end
                 if onScreen and screenPos.Z > 0 then
                     if isVisible(part) then
                         local toTarget = (part.Position - originPos)
