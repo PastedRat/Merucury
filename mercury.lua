@@ -229,8 +229,8 @@ local MiscTab = buildTabAdapter("Misc")
 
 local Settings = {
     Enabled = false,
-    Mode = "Toggle", -- Toggle / Hold
-    AimKey = Enum.KeyCode.Q,
+    Mode = "Hold", -- Toggle / Hold
+    AimKey = Enum.UserInputType.MouseButton2,
     LockPart = "Head",
     Sensitivity = 0.1,
     TeamCheck = false,
@@ -1204,9 +1204,9 @@ CombatTab:Dropdown({
 
 local AimbotBind = CombatTab:Keybind({
     Name = "Aimbot Key",
-    Keybind = Enum.KeyCode.Q,
-    Mode = "Toggle",
-    Description = "Activation key (right-click to switch Toggle/Hold)",
+    Keybind = Enum.UserInputType.MouseButton2,
+    Mode = "Hold",
+    Description = "Activation key (default: Hold + MB2; right-click to switch Toggle/Hold)",
     Callback = function(aimbot, active, mode)
         setAimKey(aimbot)
 
