@@ -166,6 +166,7 @@ local function buildTabAdapter(name)
         local label = group:AddLabel(args.Name)
         local currentBind = parseLinoriaKeybind(args.Keybind, Enum.KeyCode.Q)
         local currentMode = parseLinoriaMode(args.Mode, "Toggle")
+        local isActive = false
 
         label:AddKeyPicker(id, {
             Default = enumToName(currentBind),
@@ -178,14 +179,26 @@ local function buildTabAdapter(name)
                 if parsedBind then
                     currentBind = parsedBind
                     if args.Callback then
-                        args.Callback(currentBind, nil, currentMode)
+                        args.Callback(currentBind, isActive, currentMode)
                     end
                     return
                 end
 
-                local isDown = (type(value) == "boolean") and value or nil
+                if currentMode == "Hold" then
+                    if type(value) == "boolean" then
+                        isActive = value
+                    else
+                        isActive = not isActive
+                    end
+                else
+                    if value == false then
+                        return
+                    end
+                    isActive = not isActive
+                end
+
                 if args.Callback then
-                    args.Callback(currentBind, isDown, currentMode)
+                    args.Callback(currentBind, isActive, currentMode)
                 end
             end,
             ChangedCallback = function(new)
@@ -194,6 +207,9 @@ local function buildTabAdapter(name)
                     currentBind = parsedBind
                 end
                 currentMode = parseLinoriaMode(new, currentMode)
+                if currentMode ~= "Hold" then
+                    isActive = false
+                end
 
                 if args.ChangedCallback then
                     args.ChangedCallback(currentBind, currentMode)
@@ -1164,21 +1180,6 @@ RunService.Heartbeat:Connect(function()
 end)
 
 CombatTab:Dropdown({
-    Name = "Aimbot Mode",
-    StartingText = "Toggle",
-    Description = "Toggle or Hold",
-    Items = { "Toggle", "Hold" },
-    Callback = function(value)
-        Settings.Mode = (value == "Hold") and "Hold" or "Toggle"
-        if Settings.Mode == "Hold" then
-            holding = false
-            Settings.Enabled = false
-        end
-    end
-})
-
-
-CombatTab:Dropdown({
     Name = "Aimbot Type",
     StartingText = "Camera",
     Description = "Camera lock or Silent",
@@ -1206,29 +1207,24 @@ local AimbotBind = CombatTab:Keybind({
     Keybind = Enum.KeyCode.Q,
     Mode = "Toggle",
     Description = "Activation key (right-click to switch Toggle/Hold)",
-    Callback = function(aimbot, isDown, mode)
+    Callback = function(aimbot, active, mode)
         setAimKey(aimbot)
 
-        if mode == "Hold" then
-            Settings.Mode = "Hold"
-            holding = isDown == true
-            Settings.Enabled = isDown == true
+        Settings.Mode = (mode == "Hold") and "Hold" or "Toggle"
+        if Settings.Mode == "Hold" then
+            holding = active == true
+            Settings.Enabled = active == true
             return
         end
 
-        Settings.Mode = "Toggle"
-        if isDown == false then
-            return
-        end
-
-        Settings.Enabled = not Settings.Enabled
+        holding = false
+        Settings.Enabled = active == true
         notify(Settings.Enabled and "Enabled" or "Disabled")
     end,
     ChangedCallback = function(_, mode)
-        if mode == "Hold" then
-            Settings.Mode = "Hold"
-        else
-            Settings.Mode = "Toggle"
+        Settings.Mode = (mode == "Hold") and "Hold" or "Toggle"
+        if Settings.Mode ~= "Hold" then
+            holding = false
         end
     end,
 })
