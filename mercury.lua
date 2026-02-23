@@ -275,6 +275,15 @@ local Settings = {
 
     AutoReload = false,
     AutoReloadCooldown = 0.35,
+
+    GunNoSpread = false,
+    GunGodMode = false,
+    ManipEnabled = false,
+    ManipMode = "classic",
+    ManipCycleKey = Enum.KeyCode.Q,
+
+    SilentNoPrediction = true,
+    SilentOffsetX = 100,
 }
 
 
@@ -298,6 +307,7 @@ local espObjects = {}
 local arrowObjects = {}
 local gameHooks = { installed = false, warned = false, originals = {}, refs = {} }
 local noRadHook = { installed = false, original = nil }
+local gunClientNewHook = { installed = false, original = nil }
 local lastReloadAt = 0
 
 local function newESPObject()
@@ -1020,6 +1030,164 @@ local function getSilentTargetPart(origin)
     return bestPart
 end
 
+local function getClosestHead()
+    local cam = getCamera()
+    if not cam then return nil end
+
+    local center = Vector2.new(cam.ViewportSize.X * 0.5, cam.ViewportSize.Y * 0.5)
+    local closest = nil
+    local closestDist = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            if Settings.TeamCheck and player.Team == LocalPlayer.Team then
+                continue
+            end
+
+            local head = player.Character:FindFirstChild("Head")
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if head and humanoid and humanoid.Health > 0 then
+                local screenPos, onScreen = safeWorldToViewportPoint(head.Position)
+                if screenPos and onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closest = head
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+local function applyGunClientMods(gun)
+    if type(gun) ~= "table" then return end
+
+    if Settings.GunNoSpread then
+        gun.BulletSpreadMult = 0
+        gun.BaseBulletSpread = 0
+        gun.MovementBulletSpreadMult = 0
+        gun.AimSpreadMult = 0
+
+        if type(gun.TotalAttachmentStats) == "table" then
+            gun.TotalAttachmentStats.SpreadMult = 0
+            gun.TotalAttachmentStats.AimSpreadMult = 0
+        end
+    end
+
+    if Settings.GunGodMode then
+        if type(gun.Animations) == "table" then
+            gun.Animations.Equip = nil
+        end
+        if type(gun.AnimationHandler) == "table" then
+            gun.AnimationHandler.playTrack = function() end
+        end
+
+        gun.FireDelay = 0.01
+        gun.Range = math.huge
+        if gun.MaxAmmo ~= nil then
+            gun.CurrentAmmo = gun.MaxAmmo
+        end
+
+        if type(gun.RecoilHandler) == "table" then
+            gun.RecoilHandler.RecoilMultiplier = 0
+        end
+
+        if type(gun.TotalAttachmentStats) == "table" then
+            gun.TotalAttachmentStats.RecoilMult = 0.1
+            gun.TotalAttachmentStats.SpreadMult = 0.1
+        end
+    end
+
+    if Settings.ManipEnabled and type(gun.fire) == "function" and not gun.__linoriaManipWrapped then
+        gun.__linoriaManipWrapped = true
+        local oldFire = gun.fire
+
+        gun.fire = function(self, first_shot, ...)
+            local cam = getCamera()
+            local targetHead = getClosestHead()
+            local originalPos = nil
+
+            if cam and targetHead and self.FireOriginPart then
+                originalPos = self.FireOriginPart.Position
+                local originPos = cam.CFrame.Position
+
+                if Settings.ManipMode == "crazy" then
+                    originPos = targetHead.Position + Vector3.new(math.random(-10, 10) / 100, 0.1, math.random(-10, 10) / 100)
+                elseif Settings.ManipMode == "god" then
+                    originPos = targetHead.Position - targetHead.CFrame.LookVector * 2.5
+                elseif Settings.ManipMode == "tp" then
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        local oldCF = root.CFrame
+                        local behind = targetHead.Position - targetHead.CFrame.LookVector * 3 + Vector3.new(0, 2, 0)
+                        root.CFrame = CFrame.new(behind)
+                        task.delay(0.08, function()
+                            if root.Parent then
+                                root.CFrame = oldCF
+                            end
+                        end)
+                    end
+                end
+
+                self.FireOriginPart.Position = originPos
+            end
+
+            local results = { oldFire(self, first_shot, ...) }
+
+            if originalPos and self.FireOriginPart then
+                task.delay(0.001, function()
+                    if self.FireOriginPart then
+                        self.FireOriginPart.Position = originalPos
+                    end
+                end)
+            end
+
+            return (unpack or table.unpack)(results)
+        end
+    end
+end
+
+local function installGunClientNewHook(gunClient)
+    if gunClientNewHook.installed or type(gunClient) ~= "table" or type(gunClient.new) ~= "function" then
+        return
+    end
+
+    gunClientNewHook.original = gunClient.new
+    gunClient.new = function(...)
+        local gun = gunClientNewHook.original(...)
+        if gun then
+            RunService.Heartbeat:Wait()
+            applyGunClientMods(gun)
+        end
+        return gun
+    end
+    gunClientNewHook.installed = true
+end
+
+local function cycleManipMode()
+    if Settings.ManipMode == "classic" then
+        Settings.ManipMode = "crazy"
+    elseif Settings.ManipMode == "crazy" then
+        Settings.ManipMode = "god"
+    elseif Settings.ManipMode == "god" then
+        Settings.ManipMode = "tp"
+    else
+        Settings.ManipMode = "classic"
+    end
+    notify("Manip mode: " .. string.upper(Settings.ManipMode))
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if inputMatchesBind(input, Settings.ManipCycleKey) then
+        cycleManipMode()
+    end
+end)
+
 local function installGameHooks()
     if gameHooks.installed then return true end
 
@@ -1084,16 +1252,21 @@ local function installGameHooks()
             local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or (cam and cam.CFrame.Position) or Vector3.zero
             local targetPart = getSilentTargetPart(originPos)
             if targetPart then
-                local targetPos = getPredictedPosition(targetPart)
+                local targetPos = Settings.SilentNoPrediction and targetPart.Position or getPredictedPosition(targetPart)
                 local dir = (targetPos - originPos)
                 if dir.Magnitude > 0.001 then
-                    -- Silent sketch behavior: override projectile direction directly.
-                    return dir.Unit
+                    local baseDir = dir.Unit
+                    if Settings.SilentOffsetX ~= 0 then
+                        return baseDir + Vector3.new(Settings.SilentOffsetX, 0, 0)
+                    end
+                    return baseDir
                 end
             end
         end
         return gameHooks.originals.getFireDirection(self, origin, ...)
     end
+
+    installGunClientNewHook(gunClient)
 
     gameHooks.installed = true
     notify("Gun module hooks installed")
@@ -1189,6 +1362,27 @@ CombatTab:Dropdown({
         if Settings.AimbotType == "Silent" then
             installGameHooks()
         end
+    end
+})
+
+CombatTab:Toggle({
+    Name = "Silent No Prediction",
+    StartingState = true,
+    Description = "Use current target position for silent aim",
+    Callback = function(state)
+        Settings.SilentNoPrediction = state
+    end
+})
+
+CombatTab:Slider({
+    Name = "Silent Offset X",
+    Default = 100,
+    Min = 0,
+    Max = 150,
+    Precision = 0,
+    Description = "Legacy silent direction offset",
+    Callback = function(value)
+        Settings.SilentOffsetX = math.clamp(toNumber(value, 100), 0, 150)
     end
 })
 
@@ -1540,6 +1734,56 @@ MiscTab:Slider({
     Description = "Auto reload delay (scaled /100)",
     Callback = function(value)
         Settings.AutoReloadCooldown = math.clamp(toNumber(value, 35) / 100, 0.10, 1.50)
+    end
+})
+
+MiscTab:Toggle({
+    Name = "Gun No Spread",
+    StartingState = false,
+    Description = "Set gun spread multipliers to zero",
+    Callback = function(state)
+        Settings.GunNoSpread = state
+    end
+})
+
+MiscTab:Toggle({
+    Name = "Gun God Mode",
+    StartingState = false,
+    Description = "Apply fast fire/range/ammo/recoil gun mods",
+    Callback = function(state)
+        Settings.GunGodMode = state
+    end
+})
+
+MiscTab:Toggle({
+    Name = "Manip Enabled",
+    StartingState = false,
+    Description = "Enable fire origin manipulation",
+    Callback = function(state)
+        Settings.ManipEnabled = state
+    end
+})
+
+MiscTab:Dropdown({
+    Name = "Manip Mode",
+    StartingText = "classic",
+    Description = "classic / crazy / god / tp",
+    Items = { "classic", "crazy", "god", "tp" },
+    Callback = function(value)
+        Settings.ManipMode = value
+    end
+})
+
+MiscTab:Keybind({
+    Name = "Manip Cycle Key",
+    Keybind = Enum.KeyCode.Q,
+    Mode = "Toggle",
+    Description = "Cycle manip mode",
+    Callback = function(bind)
+        local parsed = parseBindEnum(bind)
+        if parsed then
+            Settings.ManipCycleKey = parsed
+        end
     end
 })
 
