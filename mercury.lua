@@ -849,23 +849,6 @@ local function getSilentTargetPart(origin)
     return bestPart
 end
 
-local function applyBuiltInSilentAim(self, origin, targetPart, ...)
-    local cam = getCamera()
-    local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or (cam and cam.CFrame.Position) or Vector3.zero
-    if not targetPart then
-        return nil
-    end
-
-    local endPosition = getPredictedPosition(targetPart)
-    local aimDir = (endPosition - originPos)
-    if aimDir.Magnitude <= 0.001 then
-        return nil
-    end
-
-    local aimCFrame = CFrame.new(originPos, endPosition)
-    return aimCFrame, aimDir.Unit
-end
-
 local function installGameHooks()
     if gameHooks.installed then return true end
 
@@ -927,16 +910,14 @@ local function installGameHooks()
     gunClient.getfireDirection = function(self, origin, ...)
         if Settings.Enabled and Settings.AimbotType == "Silent" then
             local cam = getCamera()
-    local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or (cam and cam.CFrame.Position) or Vector3.zero
+            local originPos = typeof(origin) == "Vector3" and origin or (typeof(origin) == "CFrame" and origin.Position) or (cam and cam.CFrame.Position) or Vector3.zero
             local targetPart = getSilentTargetPart(originPos)
             if targetPart then
-                local aimCFrame, aimDir = applyBuiltInSilentAim(self, origin, targetPart, ...)
-                if aimCFrame and aimDir then
-                    local okCall, a, b, c, d = pcall(gameHooks.originals.getFireDirection, self, aimCFrame, aimDir, ...)
-                    if okCall then
-                        return a, b, c, d
-                    end
-                    return aimCFrame, aimDir
+                local targetPos = getPredictedPosition(targetPart)
+                local dir = (targetPos - originPos)
+                if dir.Magnitude > 0.001 then
+                    -- Silent sketch behavior: override projectile direction directly.
+                    return dir.Unit
                 end
             end
         end
