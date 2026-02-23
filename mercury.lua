@@ -280,7 +280,6 @@ local Settings = {
     GunGodMode = false,
     ManipEnabled = false,
     ManipMode = "classic",
-    ManipCycleKey = Enum.KeyCode.Q,
 
     SilentNoPrediction = true,
     SilentOffsetX = 100,
@@ -1168,26 +1167,6 @@ local function installGunClientNewHook(gunClient)
     gunClientNewHook.installed = true
 end
 
-local function cycleManipMode()
-    if Settings.ManipMode == "classic" then
-        Settings.ManipMode = "crazy"
-    elseif Settings.ManipMode == "crazy" then
-        Settings.ManipMode = "god"
-    elseif Settings.ManipMode == "god" then
-        Settings.ManipMode = "tp"
-    else
-        Settings.ManipMode = "classic"
-    end
-    notify("Manip mode: " .. string.upper(Settings.ManipMode))
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if inputMatchesBind(input, Settings.ManipCycleKey) then
-        cycleManipMode()
-    end
-end)
-
 local function installGameHooks()
     if gameHooks.installed then return true end
 
@@ -1771,19 +1750,6 @@ MiscTab:Dropdown({
     Items = { "classic", "crazy", "god", "tp" },
     Callback = function(value)
         Settings.ManipMode = value
-    end
-})
-
-MiscTab:Keybind({
-    Name = "Manip Cycle Key",
-    Keybind = Enum.KeyCode.Q,
-    Mode = "Toggle",
-    Description = "Cycle manip mode",
-    Callback = function(bind)
-        local parsed = parseBindEnum(bind)
-        if parsed then
-            Settings.ManipCycleKey = parsed
-        end
     end
 })
 
