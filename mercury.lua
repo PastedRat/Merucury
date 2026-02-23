@@ -1127,6 +1127,19 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not inputMatchesBind(input, Settings.AimKey) then return end
+
+    if Settings.Mode == "Toggle" then
+        Settings.Enabled = not Settings.Enabled
+        notify(Settings.Enabled and "Enabled" or "Disabled")
+    else
+        holding = true
+        Settings.Enabled = true
+    end
+end)
+
 UserInputService.InputEnded:Connect(function(input)
     if inputMatchesBind(input, Settings.AimKey) and Settings.Mode == "Hold" then
         holding = false
@@ -1177,17 +1190,8 @@ local AimbotBind = CombatTab:Keybind({
     Keybind = Enum.KeyCode.Q,
     Description = "Activation key",
     Callback = function(aimbot)
-        -- Keep bind synced if the UI provides a parsed key value.
+        -- Linoria keypicker callback is used to keep bind setting synced.
         setAimKey(aimbot)
-
-        -- Activation logic lives in keybind callback (toggle / hold).
-        if Settings.Mode == "Toggle" then
-            Settings.Enabled = not Settings.Enabled
-            notify(Settings.Enabled and "Enabled" or "Disabled")
-        else
-            holding = true
-            Settings.Enabled = true
-        end
     end
 })
 
