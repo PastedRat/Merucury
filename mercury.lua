@@ -64,6 +64,22 @@ local function enumToName(bind)
     return tostring(bind or "Q")
 end
 
+local function parseLinoriaKeybind(value, fallback)
+    if typeof(value) == "EnumItem" then
+        if value.EnumType == Enum.KeyCode or value.EnumType == Enum.UserInputType then
+            return value
+        end
+        return fallback
+    end
+
+    if type(value) == "string" then
+        local cleaned = value:gsub("Enum%.KeyCode%.", ""):gsub("Enum%.UserInputType%.", "")
+        return Enum.KeyCode[cleaned] or Enum.UserInputType[cleaned] or fallback
+    end
+
+    return fallback
+end
+
 local uid = 0
 local function nextId(prefix)
     uid = uid + 1
@@ -130,25 +146,22 @@ local function buildTabAdapter(name)
     function adapter:Keybind(args)
         local id = nextId("Keybind")
         local label = group:AddLabel(args.Name)
+        local currentBind = parseLinoriaKeybind(args.Keybind, Enum.KeyCode.Q)
+
         label:AddKeyPicker(id, {
-            Default = enumToName(args.Keybind),
+            Default = enumToName(currentBind),
             SyncToggleState = false,
             Mode = "Always",
             Text = args.Description or args.Name,
             NoUI = false,
             Callback = function()
-                local opts = getOptionsTable()
-                local value = opts and opts[id] and opts[id].Value or enumToName(args.Keybind)
-                local enum = Enum.KeyCode[value] or Enum.UserInputType[value] or value
                 if args.Callback then
-                    args.Callback(enum)
+                    args.Callback(currentBind)
                 end
             end,
             ChangedCallback = function(new)
-                local enum = Enum.KeyCode[new] or Enum.UserInputType[new] or new
-                if args.Callback then
-                    args.Callback(enum)
-                end
+                local parsed = parseLinoriaKeybind(new, currentBind)
+                currentBind = parsed or currentBind
             end,
         })
         return label
@@ -1567,6 +1580,9 @@ end)
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
+if Library.KeybindFrame then
+    Library.KeybindFrame.Visible = true
+end
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
 ThemeManager:SetFolder("Merucury")
