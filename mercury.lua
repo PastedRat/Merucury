@@ -1008,18 +1008,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-UserInputService.InputBegan:Connect(function(input)
-    if not inputMatchesBind(input, Settings.AimKey) then return end
-
-    if Settings.Mode == "Toggle" then
-        Settings.Enabled = not Settings.Enabled
-        notify(Settings.Enabled and "Enabled" or "Disabled")
-    else
-        holding = true
-        Settings.Enabled = true
-    end
-end)
-
 UserInputService.InputEnded:Connect(function(input)
     if inputMatchesBind(input, Settings.AimKey) and Settings.Mode == "Hold" then
         holding = false
@@ -1065,13 +1053,21 @@ CombatTab:Dropdown({
     end
 })
 
-CombatTab:Keybind({
+local AimbotBind = CombatTab:Keybind({
     Name = "Aimbot Key",
     Keybind = Enum.KeyCode.Q,
     Description = "Activation key",
-    Callback = function(key)
-        if not setAimKey(key) then
-            notify("Could not parse bind, try another key")
+    Callback = function(aimbot)
+        -- Keep bind synced if the UI provides a parsed key value.
+        setAimKey(aimbot)
+
+        -- Activation logic lives in keybind callback (toggle / hold).
+        if Settings.Mode == "Toggle" then
+            Settings.Enabled = not Settings.Enabled
+            notify(Settings.Enabled and "Enabled" or "Disabled")
+        else
+            holding = true
+            Settings.Enabled = true
         end
     end
 })
