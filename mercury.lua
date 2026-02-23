@@ -1,4 +1,4 @@
--- Mercury First-Person Aimbot (rebuilt from working pattern provided by user)  
+-- Linoria First-Person Aimbot
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -34,26 +34,133 @@ end
 
 local LocalPlayer = Players.LocalPlayer
 
--- Mercury loader
-local Mercury
+local repo = "https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/"
+
+local Library
+local ThemeManager
+local SaveManager
 local ok, err = pcall(function()
-    Mercury = loadstring(game:HttpGet("https://raw.githubusercontent.com/deeeity/mercury-lib/master/src.lua"))()
+    Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+    ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+    SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 end)
-if not ok or not Mercury then
-    warn("[Aimbot] Mercury failed to load: " .. tostring(err))
+if not ok or not Library or not ThemeManager or not SaveManager then
+    warn("[Aimbot] Linoria failed to load: " .. tostring(err))
     return
 end
 
-local GUI = Mercury:Create({
-    Name = "Aimbot + FOV",
-    Size = UDim2.fromOffset(540, 480),
-    Theme = Mercury.Themes.Dark,
-    Link = "https://github.com/deeeity/mercury-lib"
+local Window = Library:CreateWindow({
+    Title = "Aimbot + FOV",
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2,
 })
 
-local CombatTab = GUI:Tab({ Name = "Combat", Icon = "rbxassetid://8569322835" })
-local SettingsTab = GUI:Tab({ Name = "Settings", Icon = "rbxassetid://8569321368" })
-local MiscTab = GUI:Tab({ Name = "Misc", Icon = "rbxassetid://8569322052" })
+local function enumToName(bind)
+    if typeof(bind) == "EnumItem" then
+        return bind.Name
+    end
+    return tostring(bind or "Q")
+end
+
+local uid = 0
+local function nextId(prefix)
+    uid = uid + 1
+    return string.format("%s_%d", prefix, uid)
+end
+
+local function getOptionsTable()
+    local okGenv, genv = pcall(getgenv)
+    if okGenv and type(genv) == "table" and type(genv.Options) == "table" then
+        return genv.Options
+    end
+    if type(_G) == "table" and type(_G.Options) == "table" then
+        return _G.Options
+    end
+    if type(Options) == "table" then
+        return Options
+    end
+    return nil
+end
+
+local function buildTabAdapter(name)
+    local tab = Window:AddTab(name)
+    local group = tab:AddLeftGroupbox(name .. " Controls")
+
+    local adapter = {}
+
+    function adapter:Dropdown(args)
+        local id = nextId("Dropdown")
+        group:AddDropdown(id, {
+            Text = args.Name,
+            Values = args.Items or {},
+            Default = args.StartingText,
+            Multi = false,
+            Callback = args.Callback,
+        })
+    end
+
+    function adapter:Toggle(args)
+        local id = nextId("Toggle")
+        group:AddToggle(id, {
+            Text = args.Name,
+            Default = args.StartingState,
+            Callback = args.Callback,
+        })
+    end
+
+    function adapter:Slider(args)
+        local id = nextId("Slider")
+        group:AddSlider(id, {
+            Text = args.Name,
+            Default = args.Default,
+            Min = args.Min,
+            Max = args.Max,
+            Rounding = args.Precision or 0,
+            Compact = false,
+            Callback = args.Callback,
+        })
+    end
+
+    function adapter:Button(args)
+        group:AddButton(args.Name, args.Callback)
+    end
+
+    function adapter:Keybind(args)
+        local id = nextId("Keybind")
+        local label = group:AddLabel(args.Name)
+        label:AddKeyPicker(id, {
+            Default = enumToName(args.Keybind),
+            SyncToggleState = false,
+            Mode = "Always",
+            Text = args.Description or args.Name,
+            NoUI = false,
+            Callback = function()
+                local opts = getOptionsTable()
+                local value = opts and opts[id] and opts[id].Value or enumToName(args.Keybind)
+                local enum = Enum.KeyCode[value] or Enum.UserInputType[value] or value
+                if args.Callback then
+                    args.Callback(enum)
+                end
+            end,
+            ChangedCallback = function(new)
+                local enum = Enum.KeyCode[new] or Enum.UserInputType[new] or new
+                if args.Callback then
+                    args.Callback(enum)
+                end
+            end,
+        })
+        return label
+    end
+
+    adapter._tab = tab
+    return adapter
+end
+
+local CombatTab = buildTabAdapter("Combat")
+local SettingsTab = buildTabAdapter("Settings")
+local MiscTab = buildTabAdapter("Misc")
 
 local Settings = {
     Enabled = false,
@@ -126,7 +233,6 @@ local espObjects = {}
 local arrowObjects = {}
 local gameHooks = { installed = false, warned = false, originals = {}, refs = {} }
 local noRadHook = { installed = false, original = nil }
-local raycastSilentHook = { installed = false }
 local lastReloadAt = 0
 
 local function newESPObject()
@@ -219,7 +325,7 @@ end
 
 local function notify(text)
     pcall(function()
-        GUI:Notification({ Title = "Aimbot", Text = text, Duration = 2 })
+        Library:Notify(text, 2)
     end)
 end
 
@@ -1451,4 +1557,22 @@ Players.PlayerAdded:Connect(function(player)
     end)
 end)
 
-print("[Aimbot] Camera+Silent modes, gradient FOV arrows, and Mercury bind sync ready")
+
+local ConfigTab = Window:AddTab("UI Settings")
+local MenuGroup = ConfigTab:AddLeftGroupbox("Menu")
+
+MenuGroup:AddButton("Unload", function()
+    Library:Unload()
+end)
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+ThemeManager:SetFolder("Merucury")
+SaveManager:SetFolder("Merucury/configs")
+SaveManager:BuildConfigSection(ConfigTab)
+ThemeManager:ApplyToTab(ConfigTab)
+SaveManager:LoadAutoloadConfig()
+
+print("[Aimbot] Linoria UI + SaveManager/ThemeManager config extension ready")
